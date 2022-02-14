@@ -1,66 +1,115 @@
-
-import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
-public class ServerUI extends JFrame {
+import java.awt.event.*;
+import javax.swing.*;
+import javax.swing.border.*;
+class UI extends Frame implements ActionListener {
+	JFrame jf=new JFrame("Chat Login");
 
-    public static void main(String[] args) {
-        new ServerUI();
-    }
-    public static JFrame window;
-    public JButton start;//サーバ起動ボタン
-    public JTextArea show;
-    public Server server;
-    public JTextField port;
-    static List<Socket> clients;//サーバにアクセスしたクライアントを保存する
-    public ServerUI() {
-        window = new JFrame("Server");
-        window.setLayout(null);
-        window.setBounds(200, 200, 500, 400);
-        window.setResizable(false);
+	JPanel jp1=new JPanel();
+	JPanel jp2=new JPanel();
+	JPanel jp3=new JPanel();
+	JPanel jp4=new JPanel();
 
-        //ポート
-        JLabel label1 = new JLabel("ポート:");
-        label1.setBounds(180, 8, 50, 25);
-        window.add(label1);
-        port = new JTextField();
-        port.setBounds(220, 8, 40, 25);
-        window.add(port);
+	
+	JLabel jl1=new JLabel("Name：");
+	JLabel jl2=new JLabel("IP Address：");
+	JLabel jl3=new JLabel("port：");
 
+	JRadioButton jrb1=new JRadioButton("male");
+	JRadioButton jrb2=new JRadioButton("female");
+	//JRadioButton jrb3=new JRadioButton("secret");
 
-        //start  ボタン
-        start = new JButton("リンク開始");
-        start.setBounds(180, 300, 120, 50);
-        window.add(start);
+	public JTextField jtf1=new JTextField(10);
+	public JTextField jtf2=new JTextField(10);
+	public JTextField jtf3=new JTextField(10);
 
-        //
-        show = new JTextArea();
-        show.setBounds(15, 70, 450, 220);
-        show.setEditable(false);
-        show.setLineWrap(true);
-        show.setWrapStyleWord(true);
-        JScrollPane scrollPane1 = new JScrollPane(show);
-        scrollPane1.setBounds(15, 70, 450, 220);
-        window.add(scrollPane1);
+	JButton jb1=new JButton("Connect");
+	JButton jb2=new JButton("Disconnection");
 
+	TitledBorder tb=new TitledBorder("");
 
-        //「サーバ起動」ボタン押すと、サーバが起動する
-        start.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                server = new Server(ServerUI.this);
-            }
-        });
+	ButtonGroup gb=new ButtonGroup();
+
+	public void init() {//显示登录界面
+
+		jb1.addActionListener(this);
+		jb2.addActionListener(this);
+
+		jp1.add(jl1);
+		jp1.add(jtf1);
+		jp1.add(jrb1);
+		jp1.add(jrb2);
+		//jp1.add(jrb3);
+
+		jp2.add(jl2);
+		jp2.add(jtf2);
+		jp2.add(jl3);
+		jp2.add(jtf3);
 
 
-        window.setVisible(true);
-        show.setText("「サーバ起動」を押してサーバを起動できる\n");
-    }
+		jp3.add(jb1);
+		jp3.add(jb2);
+
+		jp4.setLayout(new GridLayout(3,1));
+		jp4.add(jp1);
+		jp4.add(jp2);
+		jp4.add(jp3);
 
 
+		jf.add(jp4);
+
+
+		jtf2.setText("localhost");
+		jtf3.setText("1111");
+
+		gb.add(jrb1);
+		gb.add(jrb2);
+		//gb.add(jrb3);
+
+		jf.setLocation(200, 200);
+		jf.setSize(350, 200);
+		jf.setResizable(false);
+		jf.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+		jf.setVisible(true);
+	}
+
+
+
+	public void actionPerformed(ActionEvent event) {//事件触发
+		jb1.setText("Connect");
+		jb2.setText("Disconnect");
+		String s1=null;
+
+		if(event.getActionCommand().equals("Disconnect")) {
+			System.exit(0);
+		}
+		if(event.getActionCommand().equals("Connect")) {
+			if(jtf1.getText().equals("")) {
+				JOptionPane.showMessageDialog(null,"Please input your name");
+			}
+			//else if(!jrb1.isSelected()&&!jrb2.isSelected()&&!jrb3.isSelected())
+			else if(!jrb1.isSelected()&&!jrb2.isSelected()) {
+				JOptionPane.showMessageDialog(null,"Please select a gender");
+			}
+			else {
+				jf.setVisible(false);
+				if(jrb1.isSelected()) {
+					s1="boy";
+				}
+				else if(jrb2.isSelected()) {
+					s1="girl";
+				}
+				ClientUI gmu=new ClientUI();
+				gmu.getClientUI(jtf1.getText(),s1);
+				gmu.sock();
+			}
+		}
+	}
+
+}
+public class ServerUI {
+	public static void main(String[] args)
+	{
+		new UI().init();
+	}
 }
