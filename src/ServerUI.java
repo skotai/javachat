@@ -1,115 +1,128 @@
+
+
+
 import java.awt.*;
+import java.net.*;
 import java.awt.event.*;
-import javax.swing.*;
-import javax.swing.border.*;
-class UI extends Frame implements ActionListener {
-	JFrame jf=new JFrame("Chat Login");
+import java.io.*;
+import java.util.Hashtable;
 
-	JPanel jp1=new JPanel();
-	JPanel jp2=new JPanel();
-	JPanel jp3=new JPanel();
-	JPanel jp4=new JPanel();
+public class ServerUI extends Panel implements ActionListener, Runnable {
+	TextField nameFile = null;
+	TextField ipFile = null;
+	String name = null;
+	Checkbox male = null, female = null;
+	CheckboxGroup group = null;
+	Button ec = null, qc = null;
+	Button ss=null;
+	Socket socket = null;
+	DataInputStream in = null;
+	DataOutputStream out = null;
+	Thread thread = null;
+	boolean icc = false;
+	Hashtable listTable;
 
-	
-	JLabel jl1=new JLabel("Name：");
-	JLabel jl2=new JLabel("IP Address：");
-	JLabel jl3=new JLabel("port：");
-
-	JRadioButton jrb1=new JRadioButton("male");
-	JRadioButton jrb2=new JRadioButton("female");
-	//JRadioButton jrb3=new JRadioButton("secret");
-
-	public JTextField jtf1=new JTextField(10);
-	public JTextField jtf2=new JTextField(10);
-	public JTextField jtf3=new JTextField(10);
-
-	JButton jb1=new JButton("Connect");
-	JButton jb2=new JButton("Disconnection");
-
-	TitledBorder tb=new TitledBorder("");
-
-	ButtonGroup gb=new ButtonGroup();
-
-	public void init() {//显示登录界面
-
-		jb1.addActionListener(this);
-		jb2.addActionListener(this);
-
-		jp1.add(jl1);
-		jp1.add(jtf1);
-		jp1.add(jrb1);
-		jp1.add(jrb2);
-		//jp1.add(jrb3);
-
-		jp2.add(jl2);
-		jp2.add(jtf2);
-		jp2.add(jl3);
-		jp2.add(jtf3);
-
-
-		jp3.add(jb1);
-		jp3.add(jb2);
-
-		jp4.setLayout(new GridLayout(3,1));
-		jp4.add(jp1);
-		jp4.add(jp2);
-		jp4.add(jp3);
-
-
-		jf.add(jp4);
-
-
-		jtf2.setText("localhost");
-		jtf3.setText("1111");
-
-		gb.add(jrb1);
-		gb.add(jrb2);
-		//gb.add(jrb3);
-
-		jf.setLocation(200, 200);
-		jf.setSize(350, 200);
-		jf.setResizable(false);
-		jf.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		jf.setVisible(true);
+	public ServerUI(Hashtable listTable) {
+		this.listTable = listTable;
+		nameFile = new TextField(10);
+		//-------------
+		ipFile=new TextField(20);
+		//-------------
+		group = new CheckboxGroup();
+		male = new Checkbox("male", true, group);
+		female = new Checkbox("female", false, group);
+		ec = new Button("connect");
+		qc = new Button("quit");
+		ec.addActionListener(this);
+		qc.addActionListener(this);
+		thread = new Thread(this);
+		add(new Label("name:"));
+		add(nameFile);
+		add(male);
+		add(female);
+		add(ec);
+		add(qc);
+		qc.setEnabled(false);
 	}
 
+	public void seticc(boolean b) {
+		icc = b;
+	}
 
+	public boolean geticc() {
+		return icc;
+	}
 
-	public void actionPerformed(ActionEvent event) {//事件触发
-		jb1.setText("Connect");
-		jb2.setText("Disconnect");
-		String s1=null;
+	public String getName() {
+		return name;
+	}
 
-		if(event.getActionCommand().equals("Disconnect")) {
-			System.exit(0);
+	public void setName(String s) {
+		name = s;
+	}
+
+	public void setSocketConnection(Socket socket, DataInputStream in,
+			DataOutputStream out) {
+
+		this.socket = socket;
+		this.in = in;
+		this.out = out;
+		try {
+			thread.start();
+		} catch (Exception e) {
+			nameFile.setText("" + e);
 		}
-		if(event.getActionCommand().equals("Connect")) {
-			if(jtf1.getText().equals("")) {
-				JOptionPane.showMessageDialog(null,"Please input your name");
-			}
-			//else if(!jrb1.isSelected()&&!jrb2.isSelected()&&!jrb3.isSelected())
-			else if(!jrb1.isSelected()&&!jrb2.isSelected()) {
-				JOptionPane.showMessageDialog(null,"Please select a gender");
-			}
-			else {
-				jf.setVisible(false);
-				if(jrb1.isSelected()) {
-					s1="boy";
+	}
+
+	public Socket getSocket() {
+		return socket;
+	}
+
+	public void actionPerformed(ActionEvent e) {
+		if (e.getSource() == ec) {
+			qc.setEnabled(true);
+			if (icc == true) {
+				nameFile.setText("chatting:" + name);
+			} else {
+				this.setName(nameFile.getText());
+				String sex = group.getSelectedCheckbox().getLabel();
+				if (socket != null && name != null) {
+					try {
+						out.writeUTF("name:" + name + " gender:" + sex);
+					} catch (IOException ee) {
+						nameFile.setText("S_thread connection" + ee);
+					}
 				}
-				else if(jrb2.isSelected()) {
-					s1="girl";
-				}
-				ClientUI gmu=new ClientUI();
-				gmu.getClientUI(jtf1.getText(),s1);
-				gmu.sock();
+			}
+		}
+		if (e.getSource() == qc) {
+			try {
+				out.writeUTF("User disconnect:");
+			} catch (IOException ee) {
 			}
 		}
 	}
 
-}
-public class ServerUI {
-	public static void main(String[] args)
-	{
-		new UI().init();
+	public void run() {
+		String message = null;
+		while (true) {
+			if (in != null) {
+				try {
+					message = in.readUTF();
+				} catch (IOException e) {
+					nameFile.setText("disconnect from server" + e);
+				}
+			}
+			if (message.startsWith("now you can chat:")) {
+				icc = true;
+				break;
+			} else if (message.startsWith("chatter:")) {
+				String people = message.substring(message.indexOf(":") + 1);
+				listTable.put(people, people);
+			} else if (message.startsWith("you can not chat:")) {
+				icc = false;
+				nameFile.setText("The nickname is already occupied");
+			}
+		}
 	}
 }
