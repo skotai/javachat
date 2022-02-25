@@ -1,164 +1,234 @@
-import java.net.*;
-import java.io.*;
-import java.util.*;
-import java.util.concurrent.*;
-import javax.swing.*;
-public class Server
-{
-	private static final int PORT=1111;
-	ClientUI gm=new ClientUI();
-	private ServerSocket server;
-	public ArrayList<PrintWriter> list;
-	public static String user;
-	public static ArrayList<User> list1=new ArrayList<User>();//定义用户集合
-	public User uu;
-	public Server(String user)
-	{
-		this.user=user;
-	}
-	public void getServer() {
-		list =new ArrayList<PrintWriter>();
-		try{
-			server=new ServerSocket(PORT);
-			System.out.println("Server start......");
-			while(true) {
-				Socket client=server.accept();//接收客户端线程
-				PrintWriter writer = new PrintWriter(client.getOutputStream());
-                list.add(writer); 
-				Thread t = new Thread(new Chat(client));
-                t.start();
+
+
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Enumeration;
+import java.util.Hashtable;
+
+public class Server {
+	public static void main(String args[]) {
+		ServerSocket server = null;
+		Socket you = null;
+		Hashtable peopleList;
+		peopleList = new Hashtable();
+
+		while (true) {
+			try {
+				server = new ServerSocket(6666);
+			} catch (IOException e1) {
+				System.out.println("listening");
 			}
-		}catch(Exception ex){
-			ex.printStackTrace();
-		}
-	}
-	public static void main(String[] args)
-	{
-		new Server(user).getServer();
-	}
-	class Chat implements Runnable {
-		Socket socket;
-		private BufferedReader br;
-		private String msg;
-		private String mssg="";
-		
-		public Chat(Socket socket) {
-			try{
-				this.socket=socket;
-			}catch(Exception ex){
-				ex.printStackTrace();
+			try {
+				you = server.accept();
+				InetAddress address = you.getInetAddress();
+				System.out.println("User IP:" + address);
+
+			} catch (IOException e) {
+			}
+			if (you != null) {
+				S_thread peopleThread = new S_thread(you, peopleList);
+				peopleThread.start();
+			} else {
+				continue;
 			}
 		}
-		public void run() {
-			try{
-				br=new BufferedReader(new InputStreamReader(socket.getInputStream()));
-				while((msg=br.readLine())!=null) {
-					
-					if(msg.equals("1008611")) {//匹配字符串 显示好友列表
-						msg=br.readLine();
-						String[] st=msg.split(":");//将用户信息跟消息分隔开
-						uu=new User(st[0],st[1],socket);//将用户信息添加到User对象中
-						list1.add(uu);//将对象添加到用户集合
-						Iterator<User> it=Server.list1.iterator();//遍历用户集合
-						while(it.hasNext()) {
-							User use=it.next();
-							msg=use.getName()+"("+use.getSex()+"):";
-							mssg+=msg;//将所有的用户信息连接成一个字符串
-						}
-						sendMessage("1008611");//显示好友列表匹配标识
-						sendMessage(mssg);//群发消息
-						}
-					
-					else if(msg.equals("10010")) {//显示说话消息
-						msg=br.readLine();
-						System.out.println(msg);
-						sendMessage("10010");//显示说话信息匹配标识
-						sendMessage(msg);
-					}
-					else if(msg.equals("10086")) {//显示进入聊天室
-						msg=br.readLine();
-						System.out.println(msg);
-						sendMessage("10086");//进入聊天室匹配标识
-						sendMessage(msg);
-					}
-					else if(msg.equals("841163574")) {//私聊
-						msg=br.readLine();
-						String[] rt=msg.split("1072416535");//把传进来的用户信息跟说话内容分开
-						System.out.println(rt[1]);//在服务器端显示说话内容
-						String[] tg=rt[0].split(":");//因为是私聊，传过来两个用户的用户信息，这句作用是再把两个用户信息分开
-						Iterator<User> iu=Server.list1.iterator();//遍历用户集合
-						while(iu.hasNext()) {
-							User se=iu.next();
-							if(tg[1].equals(se.getName()+"("+se.getSex()+")")) {//如果传进来的用户信息跟集合中的用户信息吻合
-								try{
-									PrintWriter pwriter=new PrintWriter(se.getSock().getOutputStream());//建立用户自己的流
-									pwriter.println("841163574");//匹配标识
-									pwriter.println(rt[1]);//向单独用户发送消息
-									pwriter.flush();
-									System.out.println(rt[1]);
-								}catch(Exception ex){
-									ex.printStackTrace();
-								}
-							}
-							else if(tg[0].equals(se.getName())) {//如果传进来的用户信息跟集合中的用户信息吻合
-								try{
-									PrintWriter pwr=new PrintWriter(se.getSock().getOutputStream());//建立用户自己的流
-									pwr.println("841163574");//匹配标识
-									pwr.println(rt[1]);//向单独用户发送消息
-									pwr.flush();
-									System.out.println(rt[1]);
-								}catch(Exception ex){
-									ex.printStackTrace();
-								}
+	}
+}
+
+class S_thread extends Thread {
+	String name = null, sex = null;
+	Socket socket = null;
+	File file = null;
+	DataOutputStream out = null;
+	DataInputStream in = null;
+	Hashtable peopleList = null;
+
+	S_thread(Socket t, Hashtable list) {
+		peopleList = list;
+		socket = t;
+		try {
+			in = new DataInputStream(socket.getInputStream());
+			out = new DataOutputStream(socket.getOutputStream());
+		} catch (IOException e) {
+		}
+	}
+
+	public void run() {
+
+		while (true) {
+			String s = null;
+			try {
+				s = in.readUTF();
+
+				if (s.startsWith("name:")) {
+					name = s.substring(s.indexOf(":") + 1, s.indexOf(" gender"));
+					sex = s.substring(s.lastIndexOf(":") + 1);
+
+					boolean boo = peopleList.containsKey(name);
+					if (boo == false) {
+						peopleList.put(name, this);
+						out.writeUTF("now you can chat:");
+						Enumeration enum2 = peopleList.elements();
+						while (enum2.hasMoreElements()) {
+							S_thread th = (S_thread) enum2
+									.nextElement();
+							th.out.writeUTF("chatter:" + name + " gender" + sex);
+
+							if (th != this) {
+								out.writeUTF("chatter:" + th.name + " gender" + th.sex);
 							}
 						}
-						
+
+					} else {
+						out.writeUTF("you can not chat:");
 					}
-					else if(msg.equals("456987")) {//下线
-						msg=br.readLine();
-						System.out.println(msg);//在服务端显示信息
-						sendMessage("456987");//匹配字符串
-						sendMessage(msg);//匹配完毕后群发消息
-						String[] si=msg.split(":");//将传过来的用户名跟信息分隔开
-						Iterator<User> at=Server.list1.iterator();//遍历用户集合
-						while(at.hasNext())
-						{
-							User sr=at.next();
-							if(sr.getName().equals(si[0]))//如果传过来的用户名跟用户集合里的用户吻合
-							{
-								list1.remove(sr);//将吻合的用户移除
-								sr.getSock().close();//关闭此用户的socket
+
+				} else if (s.startsWith("public chat:")) {
+					String message = s.substring(s.indexOf(":") + 1);
+					Enumeration enum2 = peopleList.elements();
+					while (enum2.hasMoreElements()) {
+						((S_thread) enum2.nextElement()).out
+								.writeUTF("chat content:" + message);
+					}
+
+				} else if (s.startsWith("Document waiting for confirmation:")) {
+
+					// JOptionPane.showMessageDialog(null, s);
+					String filePath = s.substring(s.indexOf("#") + 1, s
+							.indexOf("$"));
+					String fromPeople = s.substring(s.indexOf(":") + 1, s
+							.indexOf("@"));
+					// String toPeople = s.substring(s.indexOf("#") +
+					// 1,s.indexOf("$"));
+
+					String toPeople = s.substring(s.indexOf("$") + 1);
+					S_thread toThread = (S_thread) peopleList
+							.get(toPeople);
+					// if (toThread != null) {
+					//
+
+					toThread.out.writeUTF("Document waiting for confirmation:" + fromPeople + "@"
+							+ toPeople + "$" + filePath);
+					// } else {
+					// out.writeUTF("Document waiting for confirmation:" + toPeople + "already disconnect");
+					// }
+
+				} else if (s.startsWith("User disconnect:")) {
+					Enumeration enum2 = peopleList.elements();
+					while (enum2.hasMoreElements()) {
+						try {
+							S_thread th = (S_thread) enum2
+									.nextElement();
+							if (th != this && th.isAlive()) {
+								th.out.writeUTF("User disconnection:" + name);
 							}
+						} catch (IOException eee) {
 						}
-						break;
 					}
-					else if(msg.equals("123654")) {//刷新
-						String mssge="";
-						Iterator<User> iter=Server.list1.iterator();//遍历用户集合
-						while(iter.hasNext()) {
-							User uus=iter.next();
-							msg=uus.getName()+"("+uus.getSex()+"):";
-							mssge+=msg;//将所有的用户信息连接成一个字符串
-							
+					peopleList.remove(name);
+					socket.close();
+					System.out.println(name + "User disconnection");
+					break;
+				} else if (s.startsWith("private talk:")) {
+					String pt = s
+							.substring(s.indexOf(":") + 1, s.indexOf("#"));
+					// String pt=悄悄话1+"  天哪";
+					String toPeople = s.substring(s.indexOf("#") + 1);
+
+					S_thread toThread = (S_thread) peopleList
+							.get(toPeople);
+					if (toThread != null) {
+						toThread.out.writeUTF("private talk:" + pt);
+					} else {
+						out.writeUTF("private talk:" + toPeople + "already disconnect");
+					}
+
+				} else if (s.startsWith("file confirm ")) {
+					String filePath = s.substring(s.indexOf("$") + 1);
+					String fromPeople = s.substring(s.indexOf(":") + 1, s.indexOf("$"));
+					// 向用户二进行传输文件
+
+					S_thread fromThread = (S_thread) peopleList
+							.get(fromPeople);
+					String toPeople = s.substring(s.indexOf("$") + 1);
+					fromThread.out.writeUTF("agree:" + "$" + filePath);
+
+					// 创建文件流用来读取文件中的数据
+
+					File file = new File(filePath);
+
+					FileInputStream fos = new FileInputStream(file);
+
+					// 创建网络服务器接受客户请求
+					//
+					ServerSocket ss = new ServerSocket(8888);
+
+					Socket client = ss.accept();
+
+					// 创建网络输出流并提供数据包装器
+
+					OutputStream netOut = client.getOutputStream();
+
+					OutputStream doc = new DataOutputStream(
+							new BufferedOutputStream(netOut));
+
+					// 创建文件读取缓冲区
+
+					byte[] buf = new byte[2048];
+
+					int num = fos.read(buf);
+
+					while (num != (-1)) {// 是否读完文件
+
+						doc.write(buf, 0, num);// 把文件数据写出网络缓冲区
+
+						doc.flush();// 刷新缓冲区把数据写往客户端
+
+						num = fos.read(buf);// 继续从文件中读取数据
+
+					}
+
+					fos.close();
+					doc.close();
+
+				} else if (s.startsWith("file complete")) {
+					String fromPeople = s.substring(s.indexOf(":") + 1, s.indexOf("$"));
+					String filePath = s.substring(s.indexOf("$") + 1);
+					S_thread fromThread = (S_thread) peopleList.get(fromPeople);
+					fromThread.out.writeUTF("file complete:" + "$" + filePath);
+
+				}
+
+			} catch (IOException ee) {
+				Enumeration enum2 = peopleList.elements();
+				while (enum2.hasMoreElements()) {
+					try {
+						S_thread th = (S_thread) enum2.nextElement();
+						if (th != this && th.isAlive()) {
+							th.out.writeUTF("User disconnection:" + name);
 						}
-						sendMessage("123654");//发送刷新匹配标识
-						sendMessage(mssge);//群发消息
+					} catch (IOException eee) {
 					}
 				}
-			}catch(IOException ex){
-				ex.printStackTrace();
+				peopleList.remove(name);
+				try {
+					socket.close();
+				} catch (IOException eee) {
+				}
+
+				System.out.println(name + "User disconnection");
+				break;
 			}
+
 		}
+
 	}
-	public void sendMessage(String message) {//群发消息方法
-			try{
-			for(PrintWriter pw:list)//输出流集合
-			{
-				pw.println(message);
-				pw.flush();
-			}
-			}catch(Exception ex){
-				ex.printStackTrace();
-			}
-		}
 }
